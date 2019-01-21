@@ -85,12 +85,25 @@ module.exports = function (opts) {
                 });
         },
         
-        verifyLineSignature: function(sig, evtParams) {
+        verifyLineSignature: function(sig, body) {
             if (!sig) {
                 throw new Error("No signature received");
             }
             console.log(`Verifying LINE Signature: ${sig}`);
-            //TODO:
+            let bodyStr = ((body) && (typeof body === "object"))
+                ? JSON.stringify(body)
+                : `${body}`;
+            let digest = crypto
+                .createHmac('SHA256', this.channelSecret)
+                .update(bodyStr)
+                .digest('base64');
+            console.log(`${bodyStr} => ${digest}`);
+            
+            if (sig !== digest) {
+                throw new Error("Invalid LINE Signature");
+            }
+            
+            //return (sig === digest);
             return true;
         },
         onGroupJoin: function(evtParams) {
@@ -167,28 +180,28 @@ module.exports = function (opts) {
                 }
             ];
             
-            console.log(`Sending Greeting Msg#${replyToken}: ${util.inspect(msgs)}`);
+            console.log(`Sending Greeting Msg(s)#${replyToken}: ${util.inspect(msgs)}`);
             
             return this.apiClient.replyMessage (replyToken, msgs)
               .then(() => {
-                  console.log(`Sent Greeting Msg#${replyToken} successfully`);
+                  console.log(`Sent Greeting Msg(s)#${replyToken} successfully`);
               })
               .catch((err) => {
-                  console.error(`Sent Greeting Msg#${replyToken} failed: `, err);
+                  console.error(`Sent Greeting Msg(s)#${replyToken} failed: `, err);
                   svc.on("error", err);
               });
         },
-        replyToMessage: function(replyToken, replyMsg, evtParams) {
+        replyToMessage: function(replyToken, replyMsgs, evtParams) {
             const svc = this;
             
-            console.log(`Sending Reply Msg#${replyToken}: ${replyMsg}`);
+            console.log(`Sending Reply Msg(s)#${replyToken}: ${util.inspect(replyMsgs)}`);
             
-            return this.apiClient.replyMessage (replyToken, replyMsg)
+            return this.apiClient.replyMessage (replyToken, replyMsgs)
               .then(() => {
-                  console.log(`Sent Reply Msg#${replyToken} successfully`);
+                  console.log(`Sent Reply Msg(s)#${replyToken} successfully`);
               })
               .catch((err) => {
-                  console.error(`Sent Reply Msg#${replyToken} failed: `, err);
+                  console.error(`Sent Reply Msg(s)#${replyToken} failed: `, err);
                   svc.on("error", err);
               });
         }
