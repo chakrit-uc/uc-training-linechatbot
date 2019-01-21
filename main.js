@@ -4,10 +4,12 @@ const util = require("util");
 const express = require("express");
 const morgan = require("morgan");
 const bodyParser = require("body-parser");
+const LineChatBotSvcImpl = require("./services/linechatbot-svc-impl");
 const _pkgInfo = require("./package.json");
 
 let lineBotConf = _pkgInfo.LINEBot || {};
 console.log(`LINE Bot channel ID: ${lineBotConf.channelID}`);
+let lineBotSvcImpl = LineChatBotSvcImpl(lineBotConf);
 
 let app = express();
 
@@ -15,12 +17,40 @@ app.use(morgan("combined"));
 //app.use(bodyParser.urlencoded({ extended: false }));
 app.use(bodyParser.json());
 
-app.post("/webhook", (req, resp) => {
+
+app.post("/webhook", (req, resp, next) => {
+    let sig = req.get("X-LINE-Signature");
     let body = req.body;
-    console.log(`${req.url} =>`, body);
+    console.log(`${req.url} => ${util.inspect(body)}`); //, body);
+    
+    let sigValid = false;
+    let sigErr;
+    try {
+        sigValid = lineBotSvcImpl.verifyLineSignature(sig, body);
+    } catch (err) {
+        sigErr = err;
+    }
+    if (!sigValid) {
+        sigErr = sigErr || new Error("Forbidden");
+        sigErr.statusCode = 403;
+        return next(sigErr);
+    }
+    
+    let status = "ok";
+    (body.events) && body.events.forEach((evt) => {
+        switch (evt.type) {
+            case "message":
+                lineBotSvcImpl.onIncomingMessage(evt.message, evt);
+                break;
+            default:
+                break;
+        }
+    });
+    status = status || "ok";
+    
     resp.json({
-        status: "ok",
-        body: body
+        status: status //,
+        //body: body
     });
 });
 

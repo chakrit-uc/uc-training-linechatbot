@@ -21,6 +21,7 @@
     },
     "LINEBot": {
         "channelID": "1640244968",
-        "token": "mcJJ5v2d4lcpoTPjueN8voxT+yek07bN5C5h8VQm+TPPL8e5v97AW1Pzrt8ZiuOXTk71aQ/lQ2yXot5fppF2rg01I7tNiIP9PxS/DQqA74wHhV5EqB1BALtg9szh7pxAJeu/oKQPoeK8NmB3ZBC0RgdB04t89/1O/w1cDnyilFU="
+        "channelSecret": "3ed25b55df250a4b073c35715040ebd1",
+        "channelToken": "mcJJ5v2d4lcpoTPjueN8voxT+yek07bN5C5h8VQm+TPPL8e5v97AW1Pzrt8ZiuOXTk71aQ/lQ2yXot5fppF2rg01I7tNiIP9PxS/DQqA74wHhV5EqB1BALtg9szh7pxAJeu/oKQPoeK8NmB3ZBC0RgdB04t89/1O/w1cDnyilFU="
     }
 }
