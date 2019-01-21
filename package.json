@@ -1,0 +1,14 @@
+{
+    "name": "NodeChatBot",
+    "version": "1.0.0",
+    "keywords": [
+        "util", "functional", "server", "client", "browser"
+    ],
+    "author": "chakrit@ucconnect.co.th", 
+    "contributors": [
+    ],
+    "scripts": {
+        "start": "node node_modules\/cross-env NODE_ENV=production main.js"
+    }
+    "dependencies": {}
+}

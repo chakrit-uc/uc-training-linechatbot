@@ -1,0 +1,8 @@
+._*
+**/._*
+nbproject/private
+node_modules
+logs/*
+*.logs
+temp/*
+*.tmp
