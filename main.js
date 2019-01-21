@@ -10,6 +10,7 @@ const _pkgInfo = require("./package.json");
 let lineBotConf = _pkgInfo.LINEBot || {};
 console.log(`LINE Bot channel ID: ${lineBotConf.channelID}`);
 let lineBotSvcImpl = LineChatBotSvcImpl(lineBotConf);
+lineBotSvcImpl.init();
 
 let app = express();
 
@@ -19,39 +20,9 @@ app.use(bodyParser.json());
 
 
 app.post("/webhook", (req, resp, next) => {
-    let sig = req.get("X-LINE-Signature");
     let body = req.body;
     console.log(`${req.url} => ${util.inspect(body)}`); //, body);
-    
-    let sigValid = false;
-    let sigErr;
-    try {
-        sigValid = lineBotSvcImpl.verifyLineSignature(sig, body);
-    } catch (err) {
-        sigErr = err;
-    }
-    if (!sigValid) {
-        sigErr = sigErr || new Error("Forbidden");
-        sigErr.statusCode = 403;
-        return next(sigErr);
-    }
-    
-    let status = "ok";
-    (body.events) && body.events.forEach((evt) => {
-        switch (evt.type) {
-            case "message":
-                lineBotSvcImpl.onIncomingMessage(evt.message, evt);
-                break;
-            default:
-                break;
-        }
-    });
-    status = status || "ok";
-    
-    resp.json({
-        status: status //,
-        //body: body
-    });
+    return lineBotSvcImpl.handleWebhookRequest(req, resp, next);
 });
 
 app.get((req, resp, next) => {
@@ -59,11 +30,12 @@ app.get((req, resp, next) => {
     err.statusCode = 404;
     next(err);
 });
-app.get((err, req, resp, next) => {
+app.use((err, req, resp, next) => {
     let statusCode = err.statusCode || 500;
     (statusCode >= 500) && console.error(err);
-    resp.status(statusCode)
-      .json({ errorMessage: err.message || "ERROR" });
+    resp.status(statusCode);
+      //.set("Content-type", "application-json");
+    resp.json({ errorMessage: err.message || "ERROR" });
 });
 
 
