@@ -151,11 +151,25 @@ module.exports = function (opts) {
         sendGreetingMessage: function(replyToken, evtParams) {
             const svc = this;
             
-            let msg = "Hello from Q Bot!";
+            let msgs = [
+                {
+                    type: "text",
+                    text: "สวัสดีชาวโลก Hello Earth people!"
+                },
+                {
+                    type: "text",
+                    text: "เรามาอย่างสันติ We come in peace!"
+                },
+                {
+                    type: "sticker",
+                    packageId: "2",
+                    stickerId: "501"
+                }
+            ];
             
-            console.log(`Sending Greeting Msg#${replyToken}: ${msg}`);
+            console.log(`Sending Greeting Msg#${replyToken}: ${util.inspect(msgs)}`);
             
-            return this.apiClient.replyMessage (replyToken, msg)
+            return this.apiClient.replyMessage (replyToken, msgs)
               .then(() => {
                   console.log(`Sent Greeting Msg#${replyToken} successfully`);
               })
