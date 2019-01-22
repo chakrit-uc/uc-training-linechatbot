@@ -458,11 +458,14 @@ module.exports = function (opts) {
             
             return Promise.all(proms1)
                 .then((results) => {
-                    return svc.modelsService.updateItem(msgSetInfo.modelKey, msgSetInfo.id, msgSetInfo);
+                    return svc.modelsService.updateItem(msgSetInfo.modelKey, msgSetInfo.id, msgSetInfo)
+                        .catch((err) => {
+                            svc.emit("error", err);
+                            return Promise.resolve(false);
+                        });
                 })
-                .catch((err) => {
-                    svc.emit("error", err);
-                    return Promise.resolve(false);
+                .then(() => {
+                    return Promise.resolve(msg2);
                 });
         },
         addUpdateStickerInfo: function(/*provider,*/ pkgID, stickerID, callbackFn) {
