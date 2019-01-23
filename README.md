@@ -1,1 +1,16 @@
 # uc-training-linechatbot
+
+## Environment Variables
+
+* **NODE_ENV**
+* **PORT**
+* **DEBUG**
+* **GCLOUD_SVC_ACCT_NAME**
+* **GCLOUD_SVC_ACCT_PROJECT_ID**
+* **GCLOUD_SVC_ACCT_CLIENT_ID**
+* **GCLOUD_SVC_ACCT_PRIVKEY_ID**
+* **GCLOUD_SVC_ACCT_PRIVKEY**
+* **LINE_CHANNEL_ID*
+* **LINE_CHANNEL_SECRET*
+* **LINE_CHANNEL_TOKEN*
+

@@ -17,25 +17,17 @@
         "@line/bot-sdk": "^6.4.0",
         "body-parser": "^1.18.3",
         "cross-env": "^5.2.0",
+        "dotenv": "^6.2.0",
         "express": "^4.16.4",
         "firebase-admin": "^6.5.0",
         "morgan": "^1.9.1"
     },
     "LINEBot": {
-        "channelID": "1640244968",
-        "channelSecret": "3ed25b55df250a4b073c35715040ebd1",
-        "channelToken": "mcJJ5v2d4lcpoTPjueN8voxT+yek07bN5C5h8VQm+TPPL8e5v97AW1Pzrt8ZiuOXTk71aQ/lQ2yXot5fppF2rg01I7tNiIP9PxS/DQqA74wHhV5EqB1BALtg9szh7pxAJeu/oKQPoeK8NmB3ZBC0RgdB04t89/1O/w1cDnyilFU="
+        "__comment": "DEPRECATED: Use process.env.LINE_CHANNEL_* instead"
     },
     "Firebase": {
-        "databaseURL": "https://ucconnect-firebase-q.firebaseio.com",
         "client": {
-            "__comment": "DEPRECATED: Use Firestore's serviceAccount method instead:",
-            "apiKey": "AIzaSyBFOlDOLTM43q_2C-nYQUEtbwDnQTIh6pQ",
-            "authDomain": "ucconnect-firebase-q.firebaseapp.com",
-            "databaseURL": "https://ucconnect-firebase-q.firebaseio.com",
-            "projectId": "ucconnect-firebase-q",
-            "storageBucket": "ucconnect-firebase-q.appspot.com",
-            "messagingSenderId": "297680660885"
+            "__comment": "DEPRECATED: Use Firestore's serviceAccount method instead:"
         }
     }
 }

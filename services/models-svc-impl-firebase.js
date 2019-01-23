@@ -271,7 +271,7 @@ module.exports = function(opts) {
         getCollection: function(modelKey, filters, opts) {
             const svc = this;
             let stmtKey = "getCollection";
-            let filters2;
+            //let filters2;
             //let filters2 = filters || {};
             let opts2 = opts || {};
             
@@ -281,10 +281,9 @@ module.exports = function(opts) {
                 .then((db) => {
                     try {
                         let modelRef = db.collection(modelKey);
-                        //TODO:
-                        //filters2 = svc.convertFiltersForFirestore(modelRef, filters, opts);
-                        /*debug(`DEBUG: Querying collection: ${modelKey} with filters: ${util.inspect(filters2)}`
-                          + ` =>\n${util.inspect(modelRef)}`);*/
+                        modelRef = svc.convertFiltersForFirestore(modelRef, filters, opts2);
+                        debug(`DEBUG: Querying collection: ${modelKey} with filters: ${util.inspect(filters)}`
+                          + ` =>\n${util.inspect(modelRef)}`);
 
                         return modelRef.get();
                     } catch (err) {
@@ -379,10 +378,12 @@ module.exports = function(opts) {
             }
 
             if (opts2.orderBy) {
-                modelRef = modelRef.orderBy(opts2.orderBy);
+                modelRef = (opts2.orderDesc)
+                    ? modelRef.orderBy(opts2.orderBy, "desc")
+                    : modelRef.orderBy(opts2.orderBy);
             }
             
-            return filters2;
+            return modelRef;
         },
     
         addItem: function(modelKey, itemKey, item) {
@@ -393,10 +394,14 @@ module.exports = function(opts) {
             return this.getDB()
                 .then((db) => {
                     try {
+                        if (!itemKey) {
+                            itemKey = svc.getItemKey(modelKey, item);
+                        }
                         let modelRef = db.collection(modelKey).doc(itemKey);
                         if (!itemKey) {
                             itemKey = newID = modelRef.id;
                             svc.setItemKey(modelKey, item, itemKey);
+                            debug(`DEBUG: Got Auto-generated ID: ${newID} for Document Ref.: ${modelRef}`);
                         }
                         //let updates = {};
                         //updates[`/${modelKey}`] = item;
@@ -408,11 +413,11 @@ module.exports = function(opts) {
                 })
                 .then((result) => {
                     (newID) && svc.setItemID(modelKey, item, newID);
-                    debug(`DEBUG: ${modelKey}.${stmtKey}(${util.inspect(item)}) => ${util.inspect(result)}`);
+                    debug(`DEBUG: ${modelKey}.${stmtKey}(${itemKey}, ${util.inspect(item)}) => ${util.inspect(result)}`);
                     console.info(`Added ${modelKey}#${itemKey}; Auto Generated ID: ${newID}: `, item);
                 })
                 .catch((err) => {
-                    debug(`ERROR: ${modelKey}.${stmtKey}(${util.inspect(item)}) => ${util.inspect(err)}`);
+                    debug(`ERROR: ${modelKey}.${stmtKey}(${itemKey}, ${util.inspect(item)}) => ${util.inspect(err)}`);
                     return Promise.reject(err);        
                 });
         },
@@ -436,7 +441,7 @@ module.exports = function(opts) {
                     }
                 })
                 .then((result) => {
-                    debug(`DEBUG: ${modelKey}.${stmtKey}(${util.inspect(item)}) => ${util.inspect(result)}`);
+                    debug(`DEBUG: ${modelKey}.${stmtKey}(${itemKey}, ${util.inspect(item)}) => ${util.inspect(result)}`);
                     console.info(`Updated ${modelKey}#${itemKey}: `, 
                         item, `; Result: ${util.inspect(result)}`);
                 })

@@ -1,5 +1,6 @@
 
 const debug = require("debug")("NodeChatBot:main");
+const path = require("path");
 const util = require("util");
 const express = require("express");
 const morgan = require("morgan");
@@ -8,8 +9,49 @@ const ModelsSvcImpl_Firebase = require("./services/models-svc-impl-firebase");
 const LineChatBotSvcImpl = require("./services/linechatbot-svc-impl");
 const _pkgInfo = require("./package.json");
 
+const envType = process.env.NODE_ENV || "dev";
+const dotenv = require('dotenv').config({
+    path: ((envType) || (envType === 0))
+        ? path.join(process.cwd(), `${envType}.env`)
+        : path.join(process.cwd(), ".env")
+});
+if (dotenv.error) {
+    console.error(dotenv.error);
+}
+debug(`DEBUG: Environment Variables: ${util.inspect(process.env)}`);
+
 let firebaseConf = _pkgInfo.Firebase || {};
-firebaseConf.serviceAccount = require("./firestore-service-account.json");
+if (process.env.GCLOUD_SVC_ACCT_NAME) {
+    let svcAcctName = process.env.GCLOUD_SVC_ACCT_NAME;
+    let gcProjectID = process.env.GCLOUD_SVC_ACCT_PROJECT_ID;
+    firebaseConf.serviceAccount = {
+        "type": "service_account",
+        client_id: process.env.GCLOUD_SVC_ACCT_CLIENT_ID,
+        client_email: `${svcAcctName}@${gcProjectID}.iam.gserviceaccount.com`,
+        project_id: gcProjectID,
+        private_key_id: process.env.GCLOUD_SVC_ACCT_PRIVKEY_ID,
+        private_key: process.env.GCLOUD_SVC_ACCT_PRIVKEY,
+        client_x509_cert_url: `https://www.googleapis.com/robot/v1/metadata/x509/`
+            + `${svcAcctName}%40${gcProjectID}.iam.gserviceaccount.com`,
+        "auth_uri": "https://accounts.google.com/o/oauth2/auth",
+        "token_uri": "https://oauth2.googleapis.com/token",
+        "auth_provider_x509_cert_url": "https://www.googleapis.com/oauth2/v1/certs"
+    };
+}
+if (!firebaseConf.serviceAccount) {
+    try {
+        firebaseConf.serviceAccount = require(`./firestore-service-account.${envType}.json`);
+    } catch (err) {
+        console.log(err.message);
+    }
+}
+if (!firebaseConf.serviceAccount) {
+    try {
+        firebaseConf.serviceAccount = require("./firestore-service-account.json");
+    } catch (err) {
+        console.log(err.message);
+    }
+}
 //console.log(`Firebase DB URL: ${firebaseConf.databaseURL}`);
 let modelsSvcConf = {
     serviceAccount: firebaseConf.serviceAccount,
@@ -24,6 +66,9 @@ let lineBotSvcImpl;
 module.exports = modelsSvcImpl.init()
     .then(() => {
         let lineBotConf = _pkgInfo.LINEBot || {};
+        (process.env.LINE_CHANNEL_ID) && (lineBotConf.channelID = process.env.LINE_CHANNEL_ID);
+        (process.env.LINE_CHANNEL_SECRET) && (lineBotConf.channelSecret = process.env.LINE_CHANNEL_SECRET);
+        (process.env.LINE_CHANNEL_TOKEN) && (lineBotConf.channelToken = process.env.LINE_CHANNEL_TOKEN);
         lineBotConf.modelsService = modelsSvcImpl;
         console.log(`LINE Bot channel ID: ${lineBotConf.channelID}`);
         lineBotSvcImpl = LineChatBotSvcImpl(lineBotConf);

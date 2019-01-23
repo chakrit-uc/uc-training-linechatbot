@@ -228,7 +228,10 @@ module.exports = function (opts) {
             console.log(`Searching greeting messages for user#${userID}`);
             let msgs2 = [];
             
-            return this.modelsService.getCollection("chatbot-greetings") //, filters)
+            return this.modelsService.getCollection("chatbot-greetings", {}, {
+                orderBy: "weight",
+                orderDesc: true
+            })
               .then((items) => {
                   let msgSets = [];
                 
@@ -359,21 +362,26 @@ module.exports = function (opts) {
                 return match;
             };
             
-            console.log(`Searching reply messages for user#${userID}`);
+            console.log(`Searching reply messages for: ${util.inspect(srcMsg)}`);
+            let msgSet1 = null;
             let replyMsgs2 = [];
             
             return Promise.all(proms1)
                 .then((results) => {
-                    return this.modelService.getCollection("chatbot-replies") //, filters);
+                    return svc.modelsService.getCollection("chatbot-replies", {}, {
+                        orderBy: "weight",
+                        orderDesc: true
+                    });
                 })
                 .then((items) => {
-                  let msgSets;
+                  let msgSets = [];
                 
                   (items) && items.forEach((item) => {
                         if (!filters(item)) {
                             return false;
                         }
-                        if ((item.messages) && (item.messages.length >= 1)) {
+                        debug(`DEBUG: Filtered chatbot-replies#${item.id} => ${util.inspect(item)}`);
+                        if ((item.replyMessages) && (item.replyMessages.length >= 1)) {
                             msgSets.push(item);
                         }
                     });
@@ -382,35 +390,110 @@ module.exports = function (opts) {
                         return Promise.resolve(false);
                     }
                     
-                    let proms2 = [];
-                    let msgSetInfo = msgSets[0];
-                    debug(`DEBUG: Selected Reply Messages Set: ${util.inspect(msgSetInfo)}`);
-                    
-                    msgSetInfo.modelKey = "chatbot-replies";
-                    let replyMsgs = msgSetInfo.replyMessages;
-                    replyMsgs.forEach((replyMsg) => {
-                        proms2.push(svc.processOutgoingMessage(replyMsg, msgSetInfo)
-                            .then((replyMsg2) => {
-                                replyMsgs2.push(replyMsg2);
-                                return Promise.resolve(replyMsg2);
+                    let proms1 = [];
+                    msgSets.forEach((msgSet) => {
+                        let msgItems = [];
+                        let proms1_1 = [];
+                        (msgSet.replyMessages) && msgSet.replyMessages.forEach((msgRef) => {
+                            //TODO: Refactor this to Models Service
+                            debug(`DEBUG: Retrieving data for chatbot-messages#${msgRef.id}: ${util.inspect(msgRef)}`);
+                            proms1_1.push(msgRef.get()
+                                .then((snapshot) => {
+                                    debug(`DEBUG: Got snapshot for chatbot-messages#${msgRef.id}: ${util.inspect(snapshot)}`);
+                                    let msg = snapshot.data();
+                                    (snapshot.id) && svc.modelsService.setItemID(msg, snapshot.id);
+                                    return Promise.resolve(msg);
+                                })
+                                .catch((err) => {
+                                    svc.emit("error", err);
+                                    return Promise.resole(null);
+                                })
+                            );
+                        });
+                        proms1.push(Promise.all(proms1_1)
+                            .then((results) => {
+                                msgSet.messages = results;
+                                return Promise.resolve(msgSet);
                             })
                             .catch((err) => {
                                 svc.emit("error", err);
-                                return Promise.reject(err);
+                                return Promise.resole(null);
                             })
                         );
                     });
                     
+                    return Promise.all(proms1);
+                })
+                .then((msgSets) => {
+                    if (!msgSets) {
+                        return Promise.resolve(false);
+                    }
+                    debug(`DEBUG: Got Message Sets: ${util.inspect(msgSets)}`);
+                  
+                    let proms2 = [];
+                    let scriptResults = [];
+                    let scriptSuccess = false;
+                    msgSets.forEach((msgSet) => {
+                        (!msgSet1) && (msgSet1 = msgSet);
+                        if ((msgSet.script) || (msgSet.script === 0)) {
+                            debug(`DEBUG: Triggering Bot Script[${msgSet.script}].onReplying()`);
+                            try {
+                                let botScript = require(`./bot-scripts/${msgSet.script}`);
+                                (botScript) && proms2.push(botScript.onReplying
+                                    .call(svc, replyToken, srcMsg, evtParams, msgSets, replyMsgs2)
+                                    .then((result) => {
+                                        debug(`DEBUG: Result of Bot Script[${msgSet.script}].onReplying() => ${result}`);
+                                        scriptResults.push(result);
+                                        scriptSuccess = scriptSuccess || result;
+                                    })
+                                    .catch((err) => {
+                                        svc.emit("error", err);
+                                        return Promise.reject(err);
+                                    })
+                                );
+                            } catch (err) {
+                                console.warn(err.message);
+                            }
+                        }
+                    });
+                    
                     return Promise.all(proms2);
                 })
-                .then((results) => {
+                .then((results2) => {
+                    let proms3 = [];
+                  
+                    if ((replyMsgs2.length < 1) && (msgSet1)) {
+                        debug(`DEBUG: Default Reply Handler: Selected Reply Messages Set: ${util.inspect(msgSet1)}`);
+                        msgSet1.modelKey = "chatbot-replies";
+                        
+                        let replyMsgs = msgSet1.replyMessages;
+                        replyMsgs.forEach((replyMsg) => {
+                            proms3.push(svc.processOutgoingMessage(replyMsg, msgSet1)
+                                .then((replyMsg2) => {
+                                    replyMsgs2.push(replyMsg2);
+                                    return Promise.resolve(replyMsg2);
+                                })
+                                .catch((err) => {
+                                    svc.emit("error", err);
+                                    return Promise.reject(err);
+                                })
+                            );
+                        });
+                    }
+                
+                    return Promise.all(proms3);
+                })
+                .then((results3) => {
+                    if (replyMsgs2.length < 1) {
+                        return Promise.resolve(0);
+                    }
                     console.log(`Sending Reply Msg(s)#${replyToken}: ${util.inspect(replyMsgs2)}`);
 
                     return svc.apiClient.replyMessage(replyToken, replyMsgs2);
                 })
-                .then((results) => {
-                    console.log(`Sent Reply Msg(s)#${replyToken} successfully`);
-                    return Promise.resolve(results);
+                .then((result) => {
+                    console.log(`Sent Reply Msg(s)#${replyToken} (${result})`);
+                    return Promise.resolve(result);
                 })
                 .catch((err) => {
                     console.error(`Failed Sending Reply Msg(s)#${replyToken}: `, err);
@@ -502,6 +585,9 @@ module.exports = function (opts) {
                         : svc.modelsService.updateItem("chatbot-stickers", itemKey, stickerInfo);
                 });
         },
+        
+        //Utility functions
+        renderTemplate: UCUtils.renderTemplate.bind(svcImpl),
         
         onError: function(err) {
             let errMsg = (err) ? err.message : null;
