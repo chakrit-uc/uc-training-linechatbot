@@ -1,7 +1,7 @@
 /* global Promise */
 
 const EventEmitter = require("events");
-const firebaseAdmin = require('firebase-admin');
+const firebaseAdmin = require("firebase-admin");
 //const firebaseFunctions = require('firebase-functions');
 //const firebase = require("firebase");
 //const firebase = require("@firebase.app").default;
@@ -24,57 +24,35 @@ module.exports = function(opts) {
     let modelDefs = ((opts2) ? opts2.models : null) || {};
     let statementsCache = {};
     //let statementParamsDefs = {};
-    let _db = null;
     */
+    let _db = null;
   
     function connect() {
-        return Promise.resolve(true);
-        
-        /*
         if (_db) {
             return Promise.reject(new Error('DB Already Connected'));
         }
         
-        return new Promise((resolve,reject) => {
-            let src = opts2.source || ':memory:';
-            let mode = opts2.mode || sqlite3.OPEN_READWRITE;
-            
-            debug(`DEBUG: Opening DB connection: ${src}; Mode: ${mode}`);
-            console.info(`Opening DB connection: ${src}`);
-            let db = new sqlite3.Database(src,
-                opts2.mode || sqlite3.OPEN_READWRITE,
-                (err) => {
-                    if (err) {
-                        return reject(err);
-                    }
-                    _db = db;
-                    resolve(db);
-                }
-            );
-        });
-        */
+        debug(`DEBUG: Opening DB connection to Firestore: ${util.inspect(serviceAccount)}`);
+        console.info("Opening DB connection to Firestore");
+        
+        _db = firebaseAdmin.firestore();
+        
+        debug(`DEBUG: Got DB instance: ${util.inspect(_db)}`);
+        
+        return Promise.resolve(_db);
     }
     function disconnect() {
         return Promise.resolve(false);
         
-        /*
         if (!_db) {
             return Promise.resolve(false);
         }
-        let db = _db;
         
-        return new Promise((resolve,reject) => {
-            debug(`DEBUG: Closing DB connection: ${util.insepct(db)}`);
-            console.warn("Closing DB connection");
-            db.close((err) => {
-                if (err) {
-                    return reject(err);
-                }
-                _db = null;
-                resolve(true);
-            });
-        });
-        */
+        debug(`DEBUG: Closing DB connection: ${util.inspect(_db)}`);
+        console.warn("Closing DB connection");
+        _db = null;
+        
+        return Promise.resolve(true);
     }
     
     function getItemKey(modelKey, item) {
@@ -138,7 +116,7 @@ module.exports = function(opts) {
                         credential: firebaseAdmin.credential.cert(serviceAccount)
                         //databaseURL: databaseURL
                     }, svc.firebaseAppName);
-                      //firebase.initializeApp(clientConfig, svc.firebaseAppName);
+                    //firebase.initializeApp(clientConfig, svc.firebaseAppName);
                     if (!app) {
                         throw new Error(`Failed initializing Firebase App [${svc.firebaseAppName}]`);
                     }
@@ -177,32 +155,30 @@ module.exports = function(opts) {
                 console.info(`Initialized Firebase App [${svc.firebaseAppName}]`);
             } else {
                 debug(`WARN: Firebase App already initialized: ${util.inspect(svc.firebaseApp)}`);
-                console.warn('Firebase App already initialized');
+                console.warn("Firebase App already initialized");
             }
             
             return Promise.all(proms)
-              .then((results) => {
-                  console.log("Init results: ", results);
+                .then((results) => {
+                    console.log("Init results: ", results);
                 
-                  return Promise.resolve(true);
-              });
+                    return Promise.resolve(true);
+                });
         }, 
         cleanup: function() {
             const svc = this;
             let proms = [];
             
-            /*
             if (_db) {
                 proms.push(disconnect());
             }
-            */
             
             return Promise.all(proms)
-              .then((results) => {
-                  console.log("Cleanup results: ", results);
+                .then((results) => {
+                    console.log("Cleanup results: ", results);
                 
-                  return Promise.resolve(null);
-              });
+                    return Promise.resolve(null);
+                });
         },
         
         defineModel: function(modelKey, modelDef) {
@@ -216,13 +192,21 @@ module.exports = function(opts) {
         getDB: function() {
             const svc = this;
             //TODO: Revise this later
-            let db = firebaseAdmin.firestore();
-              /*(svc.firebaseApp)
-                ? svc.firebaseApp.database()
-                : firebase.database();*/
-            debug(`DEBUG: Got DB instance: ${util.inspect(db)}`);
+            if (!_db) {
+                if (opts2.autoConnect) {
+                    debug(`DEBUG: getDB(): Auto-Connecting`);
+                    
+                    return connect()
+                        .then((db2) => {
+                            _db = db2;
+                            return Promise.resolve(_db);
+                        });
+                } else {
+                    console.warn("No DB connection");
+                }
+            }
             
-            return Promise.resolve(db);
+            return Promise.resolve(_db);
         },
     
         // N/A
@@ -275,7 +259,7 @@ module.exports = function(opts) {
             //let filters2 = filters || {};
             let opts2 = opts || {};
             
-            let items = [];
+            //let items = [];
 
             return this.getDB()
                 .then((db) => {
@@ -285,7 +269,8 @@ module.exports = function(opts) {
                         debug(`DEBUG: Querying collection: ${modelKey} with filters: ${util.inspect(filters)}`
                           + ` =>\n${util.inspect(modelRef)}`);
 
-                        return modelRef.get();
+                        return svc.getCollectionFromRef(modelKey, modelRef, opts);
+                        //modelRef.get();
                     } catch (err) {
                         //TODO:
                         let err1 = new Error("ModelsSvcImpl_Firebase.getCollection()#getDB().then(...)");
@@ -293,25 +278,6 @@ module.exports = function(opts) {
                         
                         return Promise.reject(err);
                     }
-                })
-                .then((snapshot) => {
-                    (snapshot) && snapshot.forEach((doc) => {
-                        //debug(`DEBUG: document#${doc.id}: ${util.inspect(doc)}`);
-                        let item = doc.data();
-                        if ((item) && (doc.id)) {
-                            svc.setItemID(modelKey, item, doc.id);
-                        }
-                        items.push(item);
-                    });
-                    
-                    return Promise.resolve(items);
-                    /*
-                    if (snapshot.exists()) {
-                        items.push(snapshot.val());
-                    } else {
-                        resolve(items);
-                    }
-                    */
                 })
                 .then((items) => {
                     debug(`DEBUG: ${modelKey}.${stmtKey}(${util.inspect(filters)}) =>\n${util.inspect(items)}`);
@@ -323,6 +289,7 @@ module.exports = function(opts) {
                 });
         },
         getItem: function(modelKey, itemKey) {
+            const svc = this;
             let stmtKey = "getItem";
             let item = null;
                     
@@ -330,19 +297,10 @@ module.exports = function(opts) {
                 .then((db) => {
                     try {
                         let modelRef = db.collection(modelKey).doc(itemKey);
-                        return modelRef.get();
+                        return svc.getItemFromRef(modelKey, modelRef, opts);
                     } catch (err) {
                         return Promise.reject(err);
                     }
-                })
-                .then((doc) => {
-                    if ((doc) && (doc.exists)) {
-                        item = doc.data();
-                    }
-                    
-                    debug(`DEBUG: ${modelKey}.${stmtKey}(${itemKey}) => ${util.inspect(item)}`);
-                    
-                    return Promise.resolve(item);
                 })
                 .catch((err) => {
                     debug(`ERROR: ${modelKey}.${stmtKey}(${itemKey}) => ${util.inspect(err)}`);
@@ -385,6 +343,136 @@ module.exports = function(opts) {
             
             return modelRef;
         },
+        getCollectionFromRef: function(modelKey, collectionRef, opts) {
+            const svc = this;
+            let opts2 = opts || {};
+            let items = [];
+            
+            if ((!collectionRef) || (!collectionRef.get) || (typeof collectionRef.get !== "function")) {
+                return Promise.resolve(false);
+            }
+
+            return collectionRef.get()
+                .then((snapshot) => {
+                    let docProms = [];
+                    (snapshot) && snapshot.forEach((doc) => {
+                        //debug(`DEBUG: document#${doc.id}: ${util.inspect(doc)}`);
+                        let item = doc.data();
+                        if ((item) && (doc.id)) {
+                            svc.setItemID(modelKey, item, doc.id);
+                        }
+                        docProms.push(svc.checkIncludeRefs(modelKey, item, opts2.includeRefs));
+                        items.push(item);
+                    });
+                    
+                    return Promise.all(docProms);
+                })
+                .then(() => {
+                    return Promise.resolve(items);
+                }); 
+        },
+        getItemsFromRefs: function(modelKey, docRefs, opts) {
+            const svc = this;
+            
+            let proms = [];
+            (docRefs) && docRefs.forEach((docRef) => {
+                if ((!docRef) || (!docRef.get) || (typeof docRef.get !== "function")) {
+                    return false;
+                }
+
+                proms.push(svc.getItemFromRef(modelKey, docRef, opts)
+                    .catch((err) => {
+                        svc.emit("error", err);
+                        return Promise.reject(err);
+                    })
+                );
+            });
+            
+            return Promise.all(proms);
+        },
+        getItemFromRef: function(modelKey, docRef, opts) {
+            const svc = this;
+            let item;
+            
+            if ((!docRef) || (!docRef.get) || (typeof docRef.get !== "function")) {
+                return Promise.resolve(false);
+            }
+
+            return docRef.get()
+                .then((doc) => {
+                    if ((doc) && (doc.exists)) {
+                        item = doc.data();
+                    }
+                    return svc.checkIncludeRefs(modelKey, item, opts2.includeRefs);
+                })
+                .then(() => {
+                    debug(`DEBUG: getItemFromRef() ${util.inspect(docRef)} => ${util.inspect(item)}`);
+                    
+                    return Promise.resolve(item);
+                });
+        },
+        checkIncludeRefs: function(modelKey, item, includeRefs) {
+            const svc = this;
+            let modelDef = modelDefs[modelKey];
+            let docProms = [];
+            
+            (includeRefs) && (includeRefs.length >= 1) && includeRefs.forEach((refPath) => {
+                //TODO: Support nested include refs
+                let refParts = refPath.split(".", 2);
+                let k1 = refParts[0];
+                let k2 = (refParts.length >= 2) ? refParts[1] : null;
+                let fldDef = ((modelDef) && (modelDef.fields))
+                    ? modelDef.fields[k1]
+                    : null;
+                let fldModelKey = (fldDef) ? fldDef.modelKey : null;
+                let fldRef = item[k1];
+                let fldVal2; 
+                if (Array.isArray(fldRef)) {
+                    fldVal2 = [];
+                    let fldProms = [];
+                    fldRef.forEach((subFldRef) => {
+                        debug(`DEBUG: getItemFromRef(${fldModelKey}, ${util.inspect(subFldRef, false, 5)}, ${k2})`);
+                        fldProms.push(
+                            svc.getItemFromRef(fldModelKey, subFldRef, {
+                                includeRefs: k2
+                            })
+                                .then((subFldItem) => {
+                                    fldVal2.push(subFldItem);
+                                    return Promise.resolve(true);
+                                })
+                                .catch((err) => {
+                                    svc.emit("error", err);
+                                    return Promise.resolve(false);
+                                })
+                        );
+                    });
+                    docProms.push(Promise.all(fldProms)
+                        .then((results) => {
+                            //Replace array field
+                            item[k1] = fldVal2;
+                            return Promise.resolve(results);
+                        })
+                    );
+                } else if (fldRef) {
+                    docProms.push(
+                        svc.getItemFromRef(fldModelKey, fldRef, {
+                            includeRefs: (refParts.length >= 2) ? refParts[1] : null
+                        })
+                            .then((fldItem) => {
+                                //Replace single field
+                                item[k1] = fldVal2;
+                                fldVal2 = fldItem;
+                                return Promise.resolve(true);
+                            })
+                    );
+                }
+            });
+            
+            return Promise.all(docProms)
+                .then(() => {
+                    return Promise.resolve(item);
+                });
+        },
     
         addItem: function(modelKey, itemKey, item) {
             const svc = this;
@@ -426,7 +514,7 @@ module.exports = function(opts) {
             let row;
             
             return this.getDB()
-              .then((db) => {
+                .then((db) => {
                     try {
                         if (!itemKey) {
                             itemKey = getItemKey(modelKey, item);
@@ -454,7 +542,7 @@ module.exports = function(opts) {
             let stmtKey = "delete";
             
             return this.getDB()
-              .then((db) => {
+                .then((db) => {
                     try {
                         let modelRef = db.collection(modelKey).doc(itemKey);
                         //let updates = {};
@@ -469,22 +557,22 @@ module.exports = function(opts) {
                     debug(`DEBUG: ${modelKey}.${stmtKey}(${itemKey}) => ${util.inspect(result)}`);
                     console.info(`Deleted ${modelKey}#${itemKey}: `, result);
                 })
-              .catch((err) => {
-                debug(`ERROR: ${modelKey}.${stmtKey}(${itemKey}) => ${util.inspect(err)}`);
-                return Promise.reject(err);        
-              });
+                .catch((err) => {
+                    debug(`ERROR: ${modelKey}.${stmtKey}(${itemKey}) => ${util.inspect(err)}`);
+                    return Promise.reject(err);        
+                });
         },
         exec: function(modelKey, stmtKey, params) {
             let params2;
             
             return this.getDB()
-              .then((db) => {
-                  //TODO:
-              })
-              .catch((err) => {
-                debug(`ERROR: ${modelKey}.${stmtKey}(${util.inspect(params2)}) => ${util.inspect(err)}`);
-                return Promise.reject(err);        
-              });
+                .then((db) => {
+                    //TODO:
+                })
+                .catch((err) => {
+                    debug(`ERROR: ${modelKey}.${stmtKey}(${util.inspect(params2)}) => ${util.inspect(err)}`);
+                    return Promise.reject(err);        
+                });
         },
         
         onError: function(err) {

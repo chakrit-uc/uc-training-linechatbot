@@ -29,5 +29,8 @@
         "client": {
             "__comment": "DEPRECATED: Use Firestore's serviceAccount method instead:"
         }
+    },
+    "devDependencies": {
+        "eslint": "^5.12.1"
     }
 }

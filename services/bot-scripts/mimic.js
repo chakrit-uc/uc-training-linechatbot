@@ -6,11 +6,11 @@ const util = require("util");
 
 let botScript;
 botScript = {
-    onGreeting: function(replyToken, evtParams, msgSets, outMsgs) {
+    onGreeting: function(replyToken, evtParams, msgSet, outMsgs) {
         const svc = this;
         return false;
     },
-    onReplying: function(replyToken, srcMsg, evtParams, msgSets, replyMsgs) {
+    onReplying: function(replyToken, srcMsg, evtParams, msgSet, replyMsgs) {
         const svc = this;
         
         console.log("Hello, I'm mimic bot!");
@@ -22,47 +22,46 @@ botScript = {
             ? evtParams.source.groupId
             : null;
             
-        debug(`DEBUG: Replying with Message Sets: ${util.inspect(msgSets)}`);
+        debug(`DEBUG: Replying with Message Sets: ${util.inspect(msgSet)}`);
         let replyMsg1 = null;
-        (msgSets) && msgSets.forEach((msgSet) => {
-            (msgSet) && (msgSet.messages) && msgSet.messages.forEach((msgTmpl) => {
-                if (!msgTmpl) {
-                    return false;
-                }
-                //Currently only supporting texts & stickers
-                switch (msgTmpl.type) {
-                    case "text":
-                        if (srcMsg.type === "text") {
-                            let replyText = (msgTmpl.text)
-                                ? svc.renderTemplate(msgTmpl.text, {
-                                    original: srcMsg.text
-                                })
-                                : srcMsg.text;
-                            debug(`DEBUG: ${msgTmpl.text} => ${replyText}`);
+        (msgSet) && (msgSet.replyMessages) && msgSet.replyMessages.forEach((msgTmpl) => {
+            if (!msgTmpl) {
+                return false;
+            }
+            //Currently only supporting texts & stickers
+            switch (msgTmpl.type) {
+                case "text":
+                    if (srcMsg.type === "text") {
+                        let replyText = (msgTmpl.text)
+                            ? svc.renderTemplate(msgTmpl.text, {
+                                original: srcMsg.text
+                            })
+                            : srcMsg.text;
+                        debug(`DEBUG: ${msgTmpl.text} => ${replyText}`);
+                        replyMsg1 = {
+                            type: msgTmpl.type,
+                            text: replyText
+                        }
+                        replyMsgs.push(replyMsg1);
+                    }
+                    break;
+                case "sticker":
+                    if (srcMsg.type === "sticker") {
+                        if (msgTmpl.stickerID) {
                             replyMsg1 = {
                                 type: msgTmpl.type,
-                                text: replyText
-                            }
-                            replyMsgs.push(replyMsg1);
+                                packageId: msgTmpl.stickerPackageID || msgTmpl.packageID,
+                                stickerId: msgTmpl.stickerID
+                            };
+                        } else {
+                            replyMsg1 = srcMsg;
                         }
-                        break;
-                    case "sticker":
-                        if (srcMsg.type === "sticker") {
-                            if (msgTmpl.stickerID) {
-                                replyMsg1 = {
-                                    packageId: msgTmpl.stickerPackageID,
-                                    stickerId: msgTmpl.stickerID
-                                };
-                            } else {
-                                replyMsg1 = srcMsg;
-                            }
-                            replyMsgs.push(replyMsg1);
-                        }
-                        break;
-                    default:
-                        return false;
-                }
-            });
+                        replyMsgs.push(replyMsg1);
+                    }
+                    break;
+                default:
+                    return false;
+            }
         });
         if (!replyMsg1) {
             //Currently only supporting texts & stickers

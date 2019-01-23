@@ -55,6 +55,7 @@ if (!firebaseConf.serviceAccount) {
 //console.log(`Firebase DB URL: ${firebaseConf.databaseURL}`);
 let modelsSvcConf = {
     serviceAccount: firebaseConf.serviceAccount,
+    autoConnect: true,
     //clientConfig: firebaseConf.client,
     models: require("./models/firebase/chatbot-model-defs")
 };

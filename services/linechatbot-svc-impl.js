@@ -230,7 +230,11 @@ module.exports = function (opts) {
             
             return this.modelsService.getCollection("chatbot-greetings", {}, {
                 orderBy: "weight",
-                orderDesc: true
+                orderDesc: true,
+                includeRefs: [
+                    "messages",
+                    "messages.sticker"
+                ]
             })
               .then((items) => {
                   let msgSets = [];
@@ -244,24 +248,6 @@ module.exports = function (opts) {
                         }
                     });
                   
-                    /*
-                    let msgs = [
-                        {
-                            type: "text",
-                            text: "สวัสดีชาวโลก Hello Earth people!"
-                        },
-                        {
-                            type: "text",
-                            text: "เรามาอย่างสันติ We come in peace!"
-                        },
-                        {
-                            type: "sticker",
-                            packageId: "2",
-                            stickerId: "501"
-                        }
-                    ];
-                    */
-           
                     if ((!msgSets) || (msgSets.length < 1)) {
                         console.log("No Greeting Message found matching condition");
                         return Promise.resolve(false);
@@ -370,7 +356,11 @@ module.exports = function (opts) {
                 .then((results) => {
                     return svc.modelsService.getCollection("chatbot-replies", {}, {
                         orderBy: "weight",
-                        orderDesc: true
+                        orderDesc: true,
+                        includeRefs: [
+                            "replyMessages",
+                            "replyMessages.sticker"
+                        ]
                     });
                 })
                 .then((items) => {
@@ -390,6 +380,9 @@ module.exports = function (opts) {
                         return Promise.resolve(false);
                     }
                     
+                    return Promise.resolve(msgSets);
+                    
+                    /*
                     let proms1 = [];
                     msgSets.forEach((msgSet) => {
                         let msgItems = [];
@@ -412,7 +405,7 @@ module.exports = function (opts) {
                         });
                         proms1.push(Promise.all(proms1_1)
                             .then((results) => {
-                                msgSet.messages = results;
+                                msgSet.replyMessages = results;
                                 return Promise.resolve(msgSet);
                             })
                             .catch((err) => {
@@ -423,12 +416,13 @@ module.exports = function (opts) {
                     });
                     
                     return Promise.all(proms1);
+                    */
                 })
                 .then((msgSets) => {
                     if (!msgSets) {
                         return Promise.resolve(false);
                     }
-                    debug(`DEBUG: Got Message Sets: ${util.inspect(msgSets)}`);
+                    debug(`DEBUG: Got Message Sets: ${util.inspect(msgSets, false, 4)}`);
                   
                     let proms2 = [];
                     let scriptResults = [];
@@ -440,7 +434,7 @@ module.exports = function (opts) {
                             try {
                                 let botScript = require(`./bot-scripts/${msgSet.script}`);
                                 (botScript) && proms2.push(botScript.onReplying
-                                    .call(svc, replyToken, srcMsg, evtParams, msgSets, replyMsgs2)
+                                    .call(svc, replyToken, srcMsg, evtParams, msgSet, replyMsgs2)
                                     .then((result) => {
                                         debug(`DEBUG: Result of Bot Script[${msgSet.script}].onReplying() => ${result}`);
                                         scriptResults.push(result);
