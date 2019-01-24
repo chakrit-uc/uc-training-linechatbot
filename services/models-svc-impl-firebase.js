@@ -310,6 +310,7 @@ module.exports = function(opts) {
         convertFiltersForFirestore: function(modelRef, filters, opts) {
             const svc = this;
             let filters2 = filters || {};
+            let opts2 = opts || {};
             
             if (typeof filters2 === "function") {
                 modelRef = filters2(modelRef);
@@ -340,6 +341,9 @@ module.exports = function(opts) {
                     ? modelRef.orderBy(opts2.orderBy, "desc")
                     : modelRef.orderBy(opts2.orderBy);
             }
+            
+            debug(`DEBUG: convertFiltersForFirestore(..., ${util.inspect(filters)}, ${util.inspect(opts)}`
+                + ` => ${util.inspect(modelRef, false, 4)}`);
             
             return modelRef;
         },
