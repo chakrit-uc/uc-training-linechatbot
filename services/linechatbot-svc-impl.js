@@ -430,13 +430,13 @@ module.exports = function (opts) {
                     msgSets.forEach((msgSet) => {
                         (!msgSet1) && (msgSet1 = msgSet);
                         if ((msgSet.script) || (msgSet.script === 0)) {
-                            debug(`DEBUG: Triggering Bot Script[${msgSet.script}].onReplying()`);
+                            console.log(`Triggering Bot Script[${msgSet.script}].onReplying()`);
                             try {
                                 let botScript = require(`./bot-scripts/${msgSet.script}`);
                                 (botScript) && proms2.push(botScript.onReplying
                                     .call(svc, replyToken, srcMsg, evtParams, msgSet, replyMsgs2)
                                     .then((result) => {
-                                        debug(`DEBUG: Result of Bot Script[${msgSet.script}].onReplying() => ${result}`);
+                                        debug(`DEBUG: Result of Bot Script[${msgSet.script}].onReplying() => ${util.inspect(result)}`);
                                         scriptResults.push(result);
                                         scriptSuccess = scriptSuccess || result;
                                     })
@@ -498,26 +498,29 @@ module.exports = function (opts) {
             const svc = this;
             
             let proms1 = [];
-            let msg2;
+            let msg2 = null;
             let stickerInfo;
             let imgInfo;
-            switch (msg.msgType) {
+            switch (msg.type) {
                 case "text":
                     msg2 = {
-                        type: msg.msgType,
-                        text: msg.msgText
+                        type: msg.type,
+                        text: msg.text
                     };
                     break;
                 case "sticker":
+                    if (!msg.sticker) {
+                        break;
+                    }
                     msg2 = {
-                        type: msg.msgType,
-                        packageId: msg.stickerPackageID,
-                        stickerId: msg.stickerID
+                        type: msg.type,
+                        packageId: msg.sticker.packageID,
+                        stickerId: msg.sticker.stickerID
                     };
                     proms1.push(
-                        svc.addUpdateStickerInfo(msg.stickerPackageID, msg.stickerID, (stickerInfo) => {
-                            stickerInfo.outFrequency = stickerInfo.outFrequency || 0;
-                            stickerInfo.outFrequency++;
+                        svc.addUpdateStickerInfo(msg.sticker.packageID, msg.sticker.stickerID, (_sticker) => {
+                            _sticker.outFrequency = _sticker.outFrequency || 0;
+                            _sticker.outFrequency++;
                         })
                             .catch((err) => {
                                 svc.emit("error", err);
@@ -526,7 +529,7 @@ module.exports = function (opts) {
                     );
                     break;
                 default:
-                    msg2 = {};
+                    //msg2 = null;
                     break;
             }
             

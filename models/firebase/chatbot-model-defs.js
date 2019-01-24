@@ -5,8 +5,11 @@ module.exports = {
         keyField: "id"
     },
     "chatbot-messages": {
+        idField: "id",
+        keyField: "id",
         fields: {
             sticker: {
+                isRef: true,
                 modelKey: "chatbot-stickers"
             }
         }
@@ -16,6 +19,7 @@ module.exports = {
         keyField: "id",
         fields: {
             messages: {
+                isRef: true,
                 modelKey: "chatbot-messages"
             }
         }
@@ -25,6 +29,7 @@ module.exports = {
         keyField: "id",
         fields: {
             messages: {
+                isRef: true,
                 modelKey: "chatbot-messages"
             }
         }

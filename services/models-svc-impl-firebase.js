@@ -15,7 +15,8 @@ module.exports = function(opts) {
     //let clientConfig = opts2.clientConfig;
     let serviceAccount = opts2.serviceAccount;
     //let databaseURL = opts2.databaseURL;
-    let modelDefs = opts2.models || {};
+    let modelDefs = {};
+    (opts2.models) && UCUtils.updateFrom(modelDefs, opts2.models);
     /*
     let autoConnect = true;
       (typeof opts2.autoConnect !== "undefined")
@@ -156,6 +157,27 @@ module.exports = function(opts) {
             } else {
                 debug(`WARN: Firebase App already initialized: ${util.inspect(svc.firebaseApp)}`);
                 console.warn("Firebase App already initialized");
+            }
+            
+            for (let modelKey in modelDefs) {
+                if (!modelDefs.hasOwnProperty(modelKey)) {
+                    continue;
+                }
+                let modelDef = modelDefs[modelKey];
+                if (!modelDef) {
+                    continue;
+                }
+                modelDef.refFields = [];
+                let flds = modelDef.fields;
+                if (flds) {
+                    for (let fldKey in flds) {
+                        if (!flds.hasOwnProperty(fldKey)) {
+                            continue;
+                        }
+                        let fldDef = flds[fldKey] || {};
+                        (fldDef.isRef) && modelDef.refFields.push(fldKey);
+                    }
+                }
             }
             
             return Promise.all(proms)
@@ -349,6 +371,7 @@ module.exports = function(opts) {
         },
         getCollectionFromRef: function(modelKey, collectionRef, opts) {
             const svc = this;
+            let modelDef = modelDefs[modelKey] || {};
             let opts2 = opts || {};
             let items = [];
             
@@ -362,10 +385,15 @@ module.exports = function(opts) {
                     (snapshot) && snapshot.forEach((doc) => {
                         //debug(`DEBUG: document#${doc.id}: ${util.inspect(doc)}`);
                         let item = doc.data();
-                        if ((item) && (doc.id)) {
-                            svc.setItemID(modelKey, item, doc.id);
-                        }
-                        docProms.push(svc.checkIncludeRefs(modelKey, item, opts2.includeRefs));
+                        (item) && (doc.id)
+                            && svc.setItemID(modelKey, item, doc.id);
+                        let includeRefs = [];
+                        (opts2.includeRefs) && (includeRefs = includeRefs.concat(opts2.includeRefs));
+                        (opts2.includeAllRefs) && (modelDef.refFields) && modelDef.refFields.forEach((refFld) => {
+                            (includeRefs.indexOf(refFld) < 0) && includeRefs.push(refFld);
+                        });
+                        
+                        docProms.push(svc.checkIncludeRefs(modelKey, item, includeRefs));
                         items.push(item);
                     });
                     
@@ -396,7 +424,9 @@ module.exports = function(opts) {
         },
         getItemFromRef: function(modelKey, docRef, opts) {
             const svc = this;
+            let modelDef = modelDefs[modelKey] || {};
             let item;
+            let itemID;
             
             if ((!docRef) || (!docRef.get) || (typeof docRef.get !== "function")) {
                 return Promise.resolve(false);
@@ -405,19 +435,33 @@ module.exports = function(opts) {
             return docRef.get()
                 .then((doc) => {
                     if ((doc) && (doc.exists)) {
+                        itemID = doc.id;
                         item = doc.data();
+                        (item) && (itemID)
+                            && svc.setItemID(modelKey, item, itemID);
                     }
-                    return svc.checkIncludeRefs(modelKey, item, opts2.includeRefs);
+                    let includeRefs = [];
+                    (opts2.includeRefs) && (includeRefs = includeRefs.concat(opts2.includeRefs));
+                    (opts2.includeAllRefs) && (modelDef.refFields) && modelDef.refFields.forEach((refFld) => {
+                        (includeRefs.indexOf(refFld) < 0) && includeRefs.push(refFld);
+                    });
+                    
+                    return svc.checkIncludeRefs(modelKey, item, includeRefs);
                 })
                 .then(() => {
-                    debug(`DEBUG: getItemFromRef() ${util.inspect(docRef)} => ${util.inspect(item)}`);
-                    
+                    debug(`DEBUG: getItemFromRef(${modelKey}#${itemID}): ${util.inspect(docRef)} => ${util.inspect(item)}`);
                     return Promise.resolve(item);
+                })
+                .catch((err) => {
+                    debug(`ERROR: getItemFromRef(${modelKey}#${itemID}): ${util.inspect(docRef)} => ${util.inspect(err)}`);
+                    return Promise.reject(err);
                 });
         },
         checkIncludeRefs: function(modelKey, item, includeRefs) {
             const svc = this;
-            let modelDef = modelDefs[modelKey];
+            let modelDef = modelDefs[modelKey] || {};
+            let item1 = {};
+            UCUtils.updateFrom(item1, item);
             let docProms = [];
             
             (includeRefs) && (includeRefs.length >= 1) && includeRefs.forEach((refPath) => {
@@ -441,7 +485,7 @@ module.exports = function(opts) {
                                 includeRefs: k2
                             })
                                 .then((subFldItem) => {
-                                    fldVal2.push(subFldItem);
+                                    (typeof subFldItem !== "undefined") && fldVal2.push(subFldItem);
                                     return Promise.resolve(true);
                                 })
                                 .catch((err) => {
@@ -474,13 +518,18 @@ module.exports = function(opts) {
             
             return Promise.all(docProms)
                 .then(() => {
+                    debug(`DEBUG: checkIncludeRefs(${modelKey}, ${util.inspect(item1)}, ${util.inspect(includeRefs)}`
+                        + ` => ${util.inspect(item)}`);
+          
                     return Promise.resolve(item);
                 });
         },
     
-        addItem: function(modelKey, itemKey, item) {
+        addItem: function(modelKey, itemKey, item, opts) {
             const svc = this;
             let stmtKey = "add";
+            let modelDef = modelDefs[modelKey] || {};
+            let opts2 = opts || {};
             let newID;
             
             return this.getDB()
@@ -495,6 +544,7 @@ module.exports = function(opts) {
                             svc.setItemKey(modelKey, item, itemKey);
                             debug(`DEBUG: Got Auto-generated ID: ${newID} for Document Ref.: ${modelRef}`);
                         }
+                        item = svc.convertItemFieldsToRefs(db, modelKey, item);
                         //let updates = {};
                         //updates[`/${modelKey}`] = item;
 
@@ -513,9 +563,10 @@ module.exports = function(opts) {
                     return Promise.reject(err);        
                 });
         },
-        updateItem: function(modelKey, itemKey, item) {
+        updateItem: function(modelKey, itemKey, item, opts) {
+            const svc = this;
             let stmtKey = "update";
-            let row;
+            let modelDef = modelDefs[modelKey] || {};
             
             return this.getDB()
                 .then((db) => {
@@ -523,6 +574,7 @@ module.exports = function(opts) {
                         if (!itemKey) {
                             itemKey = getItemKey(modelKey, item);
                         }
+                        item = svc.convertItemFieldsToRefs(db, modelKey, item);
                         let modelRef = db.collection(modelKey).doc(itemKey);
                         //let updates = {};
                         //updates[`/${modelKey}`] = item;
@@ -542,6 +594,46 @@ module.exports = function(opts) {
                     return Promise.reject(err);        
                 });
         },
+        convertItemFieldsToRefs: function(db, modelKey, item, opts) {
+            const svc = this;
+            let modelDef = modelDefs[modelKey] || {};
+            
+            if (modelDef.fields) {
+                for (let fldKey in modelDef.fields) {
+                    if (!modelDef.fields.hasOwnProperty(fldKey)) {
+                        continue;
+                    }
+                    let fldDef = modelDef.fields[fldKey];
+                    if ((!fldDef) || (!fldDef.isRef)) {
+                        continue;
+                    }
+                    let fldModelKey = fldDef.modelKey;
+                    if (!fldModelKey) {
+                        //debug(`WARN: No Model Key found for Ref. Field Definition: ${modelKey}.${fldKey}`);
+                        console.warn(`No Model Key found for Ref. Field Definition: ${modelKey}.${fldKey}`);
+                        continue;
+                    }
+                    let fldVal = item[fldKey];
+                    if (Array.isArray(fldVal)) {
+                        let fldVal2 = [];
+                        fldVal.forEach((fldValElem) => {
+                            let fldRefKey = svc.getItemKey(fldModelKey, fldValElem);
+                            debug(`DEBUG: convertItemFieldsToRefs(...): Creating Doc Ref. to: ${modelKey}.${fldKey}#${fldRefKey}`);
+                            fldVal2.push(db.collection(fldModelKey).doc(fldRefKey));
+                        });
+                        item[fldKey] = fldVal2;
+                    } else if (fldVal) {
+                        let fldRefKey = svc.getItemKey(fldModelKey, fldVal);
+                        debug(`DEBUG: convertItemFieldsToRefs(...): Creating Doc Ref. to: ${modelKey}.${fldKey}#${fldRefKey}`);
+                        item[fldKey] = db.collection(fldModelKey).doc(fldRefKey);
+                    }
+                }
+            }
+            
+            return item;
+        },
+        
+        
         deleteItem: function(modelKey, itemKey) {
             let stmtKey = "delete";
             
