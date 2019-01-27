@@ -428,6 +428,11 @@ module.exports = function (opts) {
                     let scriptResults = [];
                     let scriptSuccess = false;
                     msgSets.forEach((msgSet) => {
+                        if ((scriptSuccess) || (replyMsgs2.length >= 1)) {
+                            //Skip the rest
+                            scriptResults.push(false);
+                            return false;
+                        }
                         (!msgSet1) && (msgSet1 = msgSet);
                         if ((msgSet.script) || (msgSet.script === 0)) {
                             console.log(`Triggering Bot Script[${msgSet.script}].onReplying()`);
@@ -490,7 +495,7 @@ module.exports = function (opts) {
                     return Promise.resolve(result);
                 })
                 .catch((err) => {
-                    console.error(`Failed Sending Reply Msg(s)#${replyToken}: `, err);
+                    //console.error(`Failed Sending Reply Msg(s)#${replyToken}: `, err);
                     svc.emit("error", err);
                 });
         },
