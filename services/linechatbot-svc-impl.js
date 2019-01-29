@@ -168,7 +168,7 @@ module.exports = function (opts) {
                 return status;
             }
             
-            let replyMsg;
+            //let replyMsg;
             switch (msg.type) {
                 case "text":
                     let msgText = msg.text;
@@ -202,13 +202,26 @@ module.exports = function (opts) {
         
         sendGreetingMessage: function(replyToken, evtParams) {
             const svc = this;
+            
+            let proms1 = [];
+            
             let userID = ((evtParams) && (evtParams.source) && (evtParams.source.type === "user"))
                 ? evtParams.source.userId
                 : null;
             let groupID = ((evtParams) && (evtParams.source) && (evtParams.source.type === "group"))
                 ? evtParams.source.groupId
                 : null;
-            
+            proms1.push(svc.apiClient.getProfile(userID)
+                .then((profile1) => {
+                    evtParams.userProfile = profile1;
+                    return Promise.resolve(profile1);
+                })
+                .catch((err) => {
+                    svc.emit("error", err);
+                    return Promise.reject(err);
+                })
+            );
+          
             //TODO:
             let filters = (row) => {
                 let match = true;
@@ -228,18 +241,21 @@ module.exports = function (opts) {
             console.log(`Searching greeting messages for user#${userID}`);
             let msgs2 = [];
             
-            return this.modelsService.getCollection("chatbot-greetings", {}, {
-                orderBy: "weight",
-                orderDesc: true,
-                includeRefs: [
-                    "messages",
-                    "messages.sticker"
-                ]
-            })
-              .then((items) => {
-                  let msgSets = [];
+            return Promise.all(proms1)
+                .then(() => {
+                    return this.modelsService.getCollection("chatbot-greetings", {}, {
+                        orderBy: "weight",
+                        orderDesc: true,
+                        includeRefs: [
+                            "messages",
+                            "messages.sticker"
+                        ]
+                    });
+                })
+                .then((items) => {
+                    let msgSets = [];
                 
-                  (items) && items.forEach((item) => {
+                    (items) && items.forEach((item) => {
                         if (!filters(item)) {
                             return false;
                         }
@@ -291,11 +307,25 @@ module.exports = function (opts) {
         },
         processIncomingMessage: function(replyToken, srcMsg, evtParams) {
             const svc = this;
+            
+            let proms1 = [];
+            
             let userID = ((evtParams) && (evtParams.source) && (evtParams.source.type === "user"))
                 ? evtParams.source.userId
                 : null;
+            let userProfile = null;
             
-            let proms1 = [];
+            proms1.push(svc.apiClient.getProfile(userID)
+                .then((profile1) => {
+                    evtParams.userProfile = userProfile = profile1;
+                    return Promise.resolve(profile1);
+                })
+                .catch((err) => {
+                    svc.emit("error", err);
+                    return Promise.reject(err);
+                })
+            );
+            
             let stickerInfo;
             switch (srcMsg.type) {
                 case "text":
@@ -563,7 +593,7 @@ module.exports = function (opts) {
                 stickerID: stickerID
             })
                 .then((items) => {
-                    stickerInfo = ((items) && (items.length >= 1))
+                    let stickerInfo = ((items) && (items.length >= 1))
                         ? items[0]
                         : null;
                     let newStickerInfo = false;
@@ -589,7 +619,17 @@ module.exports = function (opts) {
         },
         
         //Utility functions
-        renderTemplate: UCUtils.renderTemplate.bind(svcImpl),
+        renderTemplate: UCUtils.renderTemplate,
+        /*
+          function(tmpl, data) {
+            let out = tmpl.replace(/\$\{(.+?)\}/g, function(match, contents, s, offset) {
+                var x = ((data) && ((contents) || (contents === 0)))
+                    ? UCUtils.getPropByPath(data,contents)
+                    : null;
+                return ((x) || (x === 0) || (x === false)) ? `${x}` : '';
+            }));
+          },
+        */
         
         onError: function(err) {
             let errMsg = (err) ? err.message : null;

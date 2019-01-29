@@ -33,5 +33,9 @@ module.exports = {
                 modelKey: "chatbot-messages"
             }
         }
+    },
+    "chatbot-persons": {
+        idField: "id",
+        keyField: "id"
     }
 };

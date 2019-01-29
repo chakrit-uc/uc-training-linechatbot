@@ -3,6 +3,7 @@
 
 const debug = require("debug")("NodeChatBot:bot-scripts:mimic");
 const util = require("util");
+const UCUtils = require("../../lib/uc-utils-node");
 
 let botScript;
 botScript = {
@@ -23,6 +24,15 @@ botScript = {
             : null;
             
         debug(`DEBUG: Replying with Message Sets: ${util.inspect(msgSet)}`);
+        let data = {
+            original: srcMsg.text,
+            user: evtParams.userProfile,
+            group: evtParams.groupInfo
+        };
+        if ((msgSet.msgPattern) && (srcMsg.text)) {
+            let regex = new RegExp(msgSet.msgPattern);
+            data.matches = regex.exec(srcMsg.text);
+        }
         let replyMsg1 = null;
         (msgSet) && (msgSet.replyMessages) && msgSet.replyMessages.forEach((msgTmpl) => {
             if (!msgTmpl) {
@@ -32,32 +42,31 @@ botScript = {
             switch (msgTmpl.type) {
                 case "text":
                     if (srcMsg.type === "text") {
-                        let replyText = (msgTmpl.text)
-                            ? svc.renderTemplate(msgTmpl.text, {
-                                original: srcMsg.text
-                            })
+                        let replyText = (msgTmpl.text) 
+                            ? svc.renderTemplate(msgTmpl.text, data)
                             : srcMsg.text;
-                        debug(`DEBUG: ${msgTmpl.text} => ${replyText}`);
+                        debug(`DEBUG: Template: ${msgTmpl.text}; Data: ${util.inspect(data)} => ${replyText}`);
                         replyMsg1 = {
                             type: msgTmpl.type,
                             text: replyText
-                        }
+                        };
                         replyMsgs.push(replyMsg1);
                     }
                     break;
                 case "sticker":
-                    if (srcMsg.type === "sticker") {
-                        if (msgTmpl.stickerID) {
-                            replyMsg1 = {
-                                type: msgTmpl.type,
-                                packageId: msgTmpl.stickerPackageID || msgTmpl.packageID,
-                                stickerId: msgTmpl.stickerID
-                            };
-                        } else {
-                            replyMsg1 = srcMsg;
-                        }
-                        replyMsgs.push(replyMsg1);
+                    replyMsg1 = {
+                        type: msgTmpl.type,
+                        packageId: (msgTmpl.sticker)
+                            ? msgTmpl.sticker.packageID 
+                            : msgTmpl.stickerPackageID  || msgTmpl.packageID,
+                        stickerId:  (msgTmpl.sticker)
+                            ? msgTmpl.sticker.stickerID
+                            : msgTmpl.stickerID
+                    };
+                    if ((!replyMsg1.stickerID) && (srcMsg.type === "sticker")) {
+                        replyMsg1 = srcMsg;
                     }
+                    replyMsgs.push(replyMsg1);
                     break;
                 default:
                     return false;
